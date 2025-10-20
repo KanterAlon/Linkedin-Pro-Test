@@ -18,6 +18,7 @@ type UploadDropzoneProps = {
 const ACCEPTED_MIME_TYPES = {
   "application/zip": [".zip"],
   "application/json": [".json"],
+  "application/pdf": [".pdf"],
 };
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
@@ -98,7 +99,7 @@ export function UploadDropzone({ onFileAccepted }: UploadDropzoneProps) {
             Arrastra tu exportación de LinkedIn
           </p>
           <p className="text-sm text-slate-300">
-            Aceptamos el archivo .zip o el JSON con tus datos completos. Máximo 50 MB.
+            Aceptamos el archivo .zip, .json o PDF con tus datos completos. Máximo 50 MB.
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300">
@@ -107,6 +108,9 @@ export function UploadDropzone({ onFileAccepted }: UploadDropzoneProps) {
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1">
             <FileText className="size-4" /> Archivo JSON
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1">
+            <FileText className="size-4" /> Archivo PDF
           </span>
         </div>
       </div>

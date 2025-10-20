@@ -12,8 +12,9 @@ import {
   SignedOut,
   UserButton,
 } from "@clerk/nextjs";
+import type { Route } from "next";
 
-import { UploadDropzone } from "@/components/upload-dropzone";
+import { PdfUploader } from "@/components/pdf-uploader";
 
 const features = [
   {
@@ -128,7 +129,7 @@ export default function Home() {
               </SignedOut>
               <SignedIn>
                 <Link
-                  href="/dashboard"
+                  href={"/dashboard" as Route}
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-400"
                 >
                   Ir al panel
@@ -169,7 +170,7 @@ export default function Home() {
                   Usamos el ZIP o JSON de LinkedIn para generar la estructura inicial de tu portafolio.
                 </p>
               </div>
-              <UploadDropzone />
+              <PdfUploader />
               <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-300">
                 <p className="flex items-center gap-2 text-slate-200">
                   <FileText className="size-4 text-blue-300" /> Seguridad al primer lugar
