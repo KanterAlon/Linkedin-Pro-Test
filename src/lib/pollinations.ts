@@ -4,6 +4,20 @@
  */
 
 const POLLINATIONS_API_URL = "https://text.pollinations.ai/openai";
+// Timeout configurable (ms) para la petición a Pollinations. Default: 60s
+const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.POLLINATIONS_TIMEOUT_MS || "60000", 10);
+// Permitir desactivar verificación TLS solo si el entorno lo pide explícitamente (solo dev)
+const INSECURE_TLS = process.env.POLLINATIONS_TLS_INSECURE === '1';
+let warnedInsecureTls = false;
+
+// Si está activado en env y no es producción, desactivar verificación TLS a nivel global
+if (INSECURE_TLS && process.env.NODE_ENV !== 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  if (!warnedInsecureTls) {
+    console.warn('⚠️ TLS verification global desactivada para Pollinations (solo dev). Usa POLLINATIONS_TLS_INSECURE=0 para restaurar.');
+    warnedInsecureTls = true;
+  }
+}
 
 export interface PollinationsMessage {
   role: "system" | "user" | "assistant";
@@ -63,8 +77,14 @@ async function sleep(ms: number): Promise<void> {
  */
 export async function reformulateAsProfessionalReport(
   extractedText: string,
-  token?: string
+  token?: string,
+  progressCallback?: (progress: number) => void
 ): Promise<ProfileData> {
+  
+  const updateProgress = (progress: number, message: string) => {
+    if (progressCallback) progressCallback(progress);
+    console.log(`[Progreso ${Math.round(progress * 100)}%] ${message}`);
+  };
   const systemPrompt = `Eres un asistente experto en análisis y estructuración de información profesional.
 
 Tu tarea es:
@@ -129,6 +149,9 @@ Recuerda: devuelve SOLO el objeto JSON, nada más.`;
   const retryDelay = 2000; // 2 segundos inicial
   let lastError: Error | null = null;
 
+  // Actualizar progreso inicial
+  updateProgress(0.1, 'Preparando solicitud a la API...');
+  
   // Intentar con token primero, luego sin token
   const authStrategies = [
     { useToken: true, name: "con autenticación" },
@@ -139,7 +162,7 @@ Recuerda: devuelve SOLO el objeto JSON, nada más.`;
     // Solo intentar con token si está disponible
     if (strategy.useToken && !token) continue;
 
-    console.log(`🔄 Intentando ${strategy.name}...`);
+    updateProgress(0.2, `Intentando conexión ${strategy.name}...`);
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -152,15 +175,24 @@ Recuerda: devuelve SOLO el objeto JSON, nada más.`;
         // Aplicar estrategia de autenticación
         if (strategy.useToken && token) {
           headers["Authorization"] = `Bearer ${token}`;
-          (bodyToSend as any).token = token;
         }
 
-        console.log(
-          `  Intento ${attempt}/${maxRetries} ${strategy.name}...`
+        updateProgress(0.2 + (0.2 * (attempt-1)/maxRetries), 
+          `Intento ${attempt}/${maxRetries} ${strategy.name}...`
         );
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS); // Timeout configurable por env
+
+        updateProgress(0.4 + (0.3 * (attempt-1)/maxRetries), 'Enviando solicitud a la API...');
+        // Si se pide explícitamente y no es producción, desactivar verificación TLS (solo para entornos con MITM/proxy)
+        if (INSECURE_TLS && process.env.NODE_ENV !== 'production') {
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+          if (!warnedInsecureTls) {
+            console.warn('⚠️ TLS verification desactivada para Pollinations (solo dev). Usa POLLINATIONS_TLS_INSECURE=0 para restaurar.');
+            warnedInsecureTls = true;
+          }
+        }
 
         const response = await fetch(POLLINATIONS_API_URL, {
           method: "POST",
@@ -196,6 +228,7 @@ Recuerda: devuelve SOLO el objeto JSON, nada más.`;
           );
         }
 
+        updateProgress(0.7 + (0.2 * (attempt-1)/maxRetries), 'Recibiendo respuesta de la API...');
         const data: PollinationsResponse = await response.json();
 
         if (!data.choices || data.choices.length === 0) {
@@ -208,37 +241,62 @@ Recuerda: devuelve SOLO el objeto JSON, nada más.`;
           throw new Error("La IA devolvió un texto vacío");
         }
 
-        // Parsear el JSON retornado
-        let profileData: ProfileData;
+        updateProgress(0.9 + (0.1 * (attempt-1)/maxRetries), 'Procesando respuesta...');
+        
+        // Intentar extraer el JSON de la respuesta
+        let jsonResponse: any;
         try {
-          profileData = JSON.parse(reformulatedText.trim());
+          jsonResponse = JSON.parse(reformulatedText.trim());
           
-          // Validar que tenga la estructura correcta
-          if (!profileData.sections || !Array.isArray(profileData.sections)) {
-            throw new Error("El JSON no tiene la estructura esperada");
+          // Validar la estructura de la respuesta
+          updateProgress(0.98, 'Validando datos...');
+          if (!jsonResponse || !Array.isArray(jsonResponse.sections)) {
+            throw new Error("Formato de respuesta inesperado de la API");
           }
           
-          if (profileData.sections.length === 0) {
+          if (jsonResponse.sections.length === 0) {
             throw new Error("El JSON no contiene secciones");
           }
           
           // Validar cada sección
-          for (const section of profileData.sections) {
+          for (const section of jsonResponse.sections) {
             if (!section.header || !section.text) {
               throw new Error("Una o más secciones tienen estructura inválida");
             }
           }
           
-          console.log(`  ✅ Éxito ${strategy.name} - ${profileData.sections.length} secciones extraídas`);
+          console.log(`  ✅ Éxito ${strategy.name} - ${jsonResponse.sections.length} secciones extraídas`);
         } catch (parseError: any) {
           console.error(`  ❌ Error parseando JSON: ${parseError.message}`);
           console.error(`  Respuesta recibida: ${reformulatedText.substring(0, 200)}...`);
           throw new Error(`Error parseando respuesta JSON: ${parseError.message}`);
         }
 
-        return profileData;
+        updateProgress(1.0, 'Procesamiento completado con éxito');
+        return jsonResponse as ProfileData;
       } catch (error: any) {
         lastError = error;
+        // Logs enriquecidos para diagnosticar 'fetch failed' (errores de red/TLS/DNS)
+        const extra: Record<string, any> = {};
+        try {
+          extra.name = error?.name;
+          extra.code = (error as any)?.code || (error?.cause && (error.cause as any).code);
+          extra.errno = (error as any)?.errno;
+          extra.syscall = (error as any)?.syscall;
+          extra.type = (error as any)?.type;
+          if (error?.cause) {
+            extra.cause = {
+              name: (error.cause as any)?.name,
+              code: (error.cause as any)?.code,
+              errno: (error.cause as any)?.errno,
+              syscall: (error.cause as any)?.syscall,
+              message: (error.cause as any)?.message,
+            };
+          }
+        } catch {}
+        if (Object.keys(extra).length) {
+          console.error("  🔎 Detalles del error de red:", extra);
+        }
         
         // Si es un error 400, no tiene sentido reintentar
         if (error.message && error.message.includes("Configuración inválida")) {
