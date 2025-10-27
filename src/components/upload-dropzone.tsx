@@ -13,6 +13,7 @@ import { twMerge } from "tailwind-merge";
 
 type UploadDropzoneProps = {
   onFileAccepted?: (file: File) => void;
+  disabled?: boolean;
 };
 
 const ACCEPTED_MIME_TYPES = {
@@ -23,7 +24,7 @@ const ACCEPTED_MIME_TYPES = {
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
-export function UploadDropzone({ onFileAccepted }: UploadDropzoneProps) {
+export function UploadDropzone({ onFileAccepted, disabled = false }: UploadDropzoneProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,13 +35,13 @@ export function UploadDropzone({ onFileAccepted }: UploadDropzoneProps) {
       setError(null);
       onFileAccepted?.(file);
     },
-    [onFileAccepted],
+    [onFileAccepted]
   );
 
   const onDropRejected = useCallback(() => {
     setSelectedFile(null);
     setError(
-      "El archivo debe ser el .zip o .json exportado desde LinkedIn y pesar menos de 50 MB.",
+      "El archivo debe ser el .zip o .json exportado desde LinkedIn y pesar menos de 50 MB."
     );
   }, []);
 
@@ -55,6 +56,7 @@ export function UploadDropzone({ onFileAccepted }: UploadDropzoneProps) {
     maxSize: MAX_SIZE_BYTES,
     onDropAccepted,
     onDropRejected,
+    disabled,
   });
 
   const rejectionMessage = useMemo(() => {
@@ -64,11 +66,11 @@ export function UploadDropzone({ onFileAccepted }: UploadDropzoneProps) {
 
     const messages = errors.map((item) => {
       if (item.code === "file-invalid-type") {
-        return "Formato no válido. Usa el ZIP o JSON que entrega LinkedIn.";
+        return "Formato no valido. Usa el ZIP o JSON que entrega LinkedIn.";
       }
 
       if (item.code === "file-too-large") {
-        return "El archivo supera el límite de 50 MB.";
+        return "El archivo supera el limite de 50 MB.";
       }
 
       return item.message;
@@ -87,7 +89,7 @@ export function UploadDropzone({ onFileAccepted }: UploadDropzoneProps) {
         {...getRootProps()}
         className={twMerge(
           "group relative flex cursor-pointer flex-col items-center justify-center gap-4 rounded-3xl border border-dashed p-10 text-center transition-all duration-200 hover:border-blue-400/60 hover:bg-blue-500/10",
-          activeClasses,
+          disabled ? "cursor-not-allowed opacity-50" : activeClasses
         )}
       >
         <input {...getInputProps()} aria-label="Carga el archivo exportado desde LinkedIn" />
@@ -96,10 +98,10 @@ export function UploadDropzone({ onFileAccepted }: UploadDropzoneProps) {
         </span>
         <div className="space-y-1">
           <p className="text-lg font-semibold text-slate-100">
-            Arrastra tu exportación de LinkedIn
+            Arrastra tu exportacion de LinkedIn
           </p>
           <p className="text-sm text-slate-300">
-            Aceptamos el archivo .zip, .json o PDF con tus datos completos. Máximo 50 MB.
+            Aceptamos el archivo .zip, .json o PDF con tus datos completos. Maximo 50 MB.
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-300">
@@ -129,3 +131,4 @@ export function UploadDropzone({ onFileAccepted }: UploadDropzoneProps) {
     </div>
   );
 }
+

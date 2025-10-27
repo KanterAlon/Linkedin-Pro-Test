@@ -1,80 +1,78 @@
 import { notFound } from "next/navigation";
-import { getUserText } from "@/lib/store";
-import { FileText, Sparkles, Code } from "lucide-react";
+import { auth } from "@clerk/nextjs/server";
+import { Code, FileText, Sparkles } from "lucide-react";
 
-export default async function UserPage({ 
-  params 
-}: { 
-  params: Promise<{ username: string }> 
-}) {
+import { ProfileRenderFlow } from "@/components/profile-render-flow";
+import { getUserProfile } from "@/lib/store";
+
+export const dynamic = "force-dynamic";
+
+type PageParams = {
+  params: Promise<{ username: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function UserPage({ params, searchParams }: PageParams) {
   const { username } = await params;
-  
-  console.log(`🔍 Buscando texto para usuario: ${username}`);
-  
-  const rawText = getUserText(username);
+  const query = searchParams ? await searchParams : {};
+  const fallbackAuthIdRaw = query.authId;
+  const fallbackAuthId =
+    typeof fallbackAuthIdRaw === "string" ? fallbackAuthIdRaw.trim() : Array.isArray(fallbackAuthIdRaw) ? fallbackAuthIdRaw[0]?.trim() : undefined;
 
-  console.log(`📄 Texto encontrado: ${rawText ? 'SÍ' : 'NO'}`);
+  const profile = await getUserProfile(username);
 
-  if (!rawText) {
-    console.log(`❌ Usuario no encontrado: ${username}`);
+  if (!profile) {
     notFound();
   }
 
-  // Verificar si es JSON válido (procesado por IA)
-  let isJson = false;
-  try {
-    JSON.parse(rawText);
-    isJson = true;
-  } catch {
-    // No es JSON válido
-  }
+  const { userId } = auth();
+  const resolvedAuthId = userId || (fallbackAuthId ?? null);
+  const isOwner = Boolean(
+    resolvedAuthId && profile.auth_user_id && profile.auth_user_id === resolvedAuthId
+  );
+
+  const hasHtml = Boolean(profile.profile_html);
+  const hasJson = Boolean(profile.profile_json);
+
+  const StatusIcon = hasHtml ? Sparkles : hasJson ? Code : FileText;
+  const statusLabel = hasHtml
+    ? "Pagina lista para compartir"
+    : hasJson
+    ? "Datos listos para renderizar"
+    : "Texto extraido del PDF";
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Background Effects */}
       <div className="absolute inset-0 -z-10 opacity-30">
         <div className="absolute left-1/3 top-24 h-[400px] w-[400px] rounded-full bg-blue-500/30 blur-3xl" />
         <div className="absolute bottom-32 right-1/4 h-[350px] w-[350px] rounded-full bg-indigo-500/20 blur-3xl" />
       </div>
 
       <div className="mx-auto w-full max-w-6xl px-6 py-12">
-        {/* Header */}
-        <header className="mb-8 space-y-4">
+        <header className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-300">
-              {isJson ? <Code className="size-6" /> : <FileText className="size-6" />}
+              <StatusIcon className="size-6" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white">{username}</h1>
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Sparkles className="size-4" />
-                <span>
-                  {isJson 
-                    ? "Datos JSON generados con IA (GPT-5)"
-                    : "Contenido extraído del PDF"
-                  }
-                </span>
-              </div>
+              <h1 className="text-3xl font-bold text-white">{profile.username}</h1>
+              <p className="flex items-center gap-2 text-sm text-slate-400">
+                <StatusIcon className="size-4" />
+                <span>{statusLabel}</span>
+              </p>
+              {isOwner && (
+                <p className="mt-2 text-xs text-slate-400">
+                  Sigue los pasos para publicar tu pagina o editala luego desde el dashboard.
+                </p>
+              )}
             </div>
+          </div>
+          <div className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300">
+            /{profile.slug}
           </div>
         </header>
 
-        {/* Content */}
-        <article className="rounded-3xl border border-white/10 bg-slate-950/60 p-8 backdrop-blur-sm shadow-2xl">
-          <pre className="text-sm text-slate-100 leading-relaxed overflow-x-auto whitespace-pre-wrap font-mono">
-            {rawText}
-          </pre>
-        </article>
-
-        {/* Footer Info */}
-        <footer className="mt-8 text-center text-sm text-slate-400">
-          <p>
-            {isJson 
-              ? "Estos datos JSON fueron generados automáticamente desde un PDF usando inteligencia artificial."
-              : "Este contenido fue extraído automáticamente desde un PDF."
-            }
-          </p>
-        </footer>
+        <ProfileRenderFlow initialProfile={profile} isOwner={isOwner} />
       </div>
     </div>
   );
