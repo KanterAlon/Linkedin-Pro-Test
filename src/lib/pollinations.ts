@@ -117,7 +117,7 @@ async function executePollinationsRequest(
         strategy.apply(headers, bodyToSend);
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
         const response = await fetch(POLLINATIONS_API_URL, {
           method: "POST",

@@ -48,6 +48,12 @@ export async function POST(req: NextRequest) {
     const { userId } = auth();
     const resolvedAuthId = userId || (fallbackAuthId ? fallbackAuthId : null);
 
+    console.log("[RENDER] Solicitud recibida", {
+      additionalInstructionsLength: additionalInstructions?.length ?? 0,
+      hasAuthFromSession: Boolean(userId),
+      hasFallbackAuth: Boolean(fallbackAuthId),
+    });
+
     if (!resolvedAuthId) {
       return NextResponse.json(
         {
@@ -61,11 +67,20 @@ export async function POST(req: NextRequest) {
     const baseProfile = await getUserProfileByAuthUserId(resolvedAuthId);
 
     if (!baseProfile) {
+      console.warn("[RENDER] No se encontro perfil para el usuario", {
+        resolvedAuthId,
+      });
       return NextResponse.json(
         { error: "No existe perfil para este usuario" },
         { status: 404 }
       );
     }
+
+    console.log("[RENDER] Perfil encontrado", {
+      slug: baseProfile.slug,
+      hasJson: Boolean(baseProfile.profile_json),
+      hasHtmlPrevio: Boolean(baseProfile.profile_html),
+    });
 
     const pollinationsToken = process.env.POLLINATIONS_API_TOKEN;
 
@@ -73,11 +88,19 @@ export async function POST(req: NextRequest) {
 
     if (!profileData) {
       if (!baseProfile.pdf_raw) {
+        console.warn("[RENDER] No hay datos estructurados ni PDF para reconstruir", {
+          slug: baseProfile.slug,
+        });
         return NextResponse.json(
           { error: "No hay datos estructurados para renderizar la pagina" },
           { status: 400 }
         );
       }
+
+      console.log("[RENDER] Reconstruyendo JSON a partir del PDF almacenado", {
+        slug: baseProfile.slug,
+        pdfCharacters: baseProfile.pdf_raw.length,
+      });
 
       profileData = await reformulateAsProfessionalReport(
         baseProfile.pdf_raw,
@@ -90,7 +113,19 @@ export async function POST(req: NextRequest) {
         pdfText: baseProfile.pdf_raw,
         resetHtml: false,
       });
+
+      console.log("[RENDER] JSON reconstruido y actualizado en Supabase", {
+        slug: baseProfile.slug,
+        sections: profileData.sections.length,
+      });
     }
+
+    console.log("[RENDER] Enviando a Pollinations para HTML", {
+      slug: baseProfile.slug,
+      sections: profileData.sections.length,
+      tokenConfigured: Boolean(pollinationsToken),
+      additionalInstructionsLength: additionalInstructions?.length ?? 0,
+    });
 
     const html = await renderProfileToHtml(
       profileData,
@@ -101,9 +136,19 @@ export async function POST(req: NextRequest) {
       pollinationsToken
     );
 
+    console.log("[RENDER] Pollinations devolvio HTML", {
+      slug: baseProfile.slug,
+      htmlLength: html.length,
+    });
+
     const savedProfile = await updateProfileHtml({
       username: baseProfile.slug,
       profileHtml: html,
+    });
+
+    console.log("[RENDER] HTML actualizado en Supabase", {
+      slug: savedProfile.slug,
+      renderedAt: savedProfile.last_rendered_at,
     });
 
     return NextResponse.json({

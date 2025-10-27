@@ -44,6 +44,12 @@ export async function POST(req: NextRequest) {
     const { userId } = auth();
     const resolvedAuthId = userId || (fallbackAuthId ? fallbackAuthId : null);
 
+    console.log("[AUGMENT] Solicitud recibida", {
+      instructionsLength: instructions.length,
+      hasAuthFromSession: Boolean(userId),
+      hasFallbackAuth: Boolean(fallbackAuthId),
+    });
+
     if (!resolvedAuthId) {
       return NextResponse.json(
         {
@@ -61,11 +67,20 @@ export async function POST(req: NextRequest) {
     const baseProfile = await getUserProfileByAuthUserId(resolvedAuthId);
 
     if (!baseProfile) {
+      console.warn("[AUGMENT] No se encontro perfil para el usuario", {
+        resolvedAuthId,
+      });
       return NextResponse.json(
         { error: "No existe perfil para este usuario" },
         { status: 404 }
       );
     }
+
+    console.log("[AUGMENT] Perfil encontrado", {
+      slug: baseProfile.slug,
+      hasJson: Boolean(baseProfile.profile_json),
+      hasPdfRaw: Boolean(baseProfile.pdf_raw),
+    });
 
     const pollinationsToken = process.env.POLLINATIONS_API_TOKEN;
 
@@ -73,11 +88,19 @@ export async function POST(req: NextRequest) {
 
     if (!currentProfile) {
       if (!baseProfile.pdf_raw) {
+        console.warn("[AUGMENT] No hay datos base ni PDF para reconstruir el perfil", {
+          slug: baseProfile.slug,
+        });
         return NextResponse.json(
           { error: "No hay datos base para reconstruir el perfil" },
           { status: 400 }
         );
       }
+
+      console.log("[AUGMENT] Reconstruyendo JSON a partir del PDF almacenado", {
+        slug: baseProfile.slug,
+        pdfCharacters: baseProfile.pdf_raw.length,
+      });
 
       currentProfile = await reformulateAsProfessionalReport(
         baseProfile.pdf_raw,
@@ -85,15 +108,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log("[AUGMENT] Enviando instrucciones a Pollinations", {
+      slug: baseProfile.slug,
+      sectionsAntes: currentProfile.sections.length,
+      tokenConfigured: Boolean(pollinationsToken),
+    });
+
     const updatedProfile = await augmentProfileWithInstructions(
       currentProfile,
       instructions,
       pollinationsToken
     );
 
+    console.log("[AUGMENT] Pollinations devolvio respuesta", {
+      slug: baseProfile.slug,
+      sectionsDespues: updatedProfile.sections.length,
+    });
+
     const savedProfile = await updateProfileJson({
       username: baseProfile.slug,
       profileJson: updatedProfile,
+    });
+
+    console.log("[AUGMENT] JSON actualizado en Supabase", {
+      slug: savedProfile.slug,
+      sections: updatedProfile.sections.length,
     });
 
     return NextResponse.json({

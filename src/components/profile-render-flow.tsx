@@ -55,14 +55,16 @@ export function ProfileRenderFlow({ initialProfile, isOwner }: ProfileRenderFlow
     ? new Date(profile.last_rendered_at).toLocaleString()
     : null;
 
+  const identityAuthId = user?.id ?? null;
+
   const handleRender = useCallback(async () => {
     setError(null);
     setSuccess(null);
     setRendering(true);
     try {
       const payload: Record<string, unknown> = {};
-      if (user?.id) {
-        payload.identityAuthId = user.id;
+      if (identityAuthId) {
+        payload.identityAuthId = identityAuthId;
       }
 
       const response = await fetch("/api/profile/render", {
@@ -87,7 +89,7 @@ export function ProfileRenderFlow({ initialProfile, isOwner }: ProfileRenderFlow
     } finally {
       setRendering(false);
     }
-  }, []);
+  }, [identityAuthId]);
 
   return (
     <div className="space-y-8">

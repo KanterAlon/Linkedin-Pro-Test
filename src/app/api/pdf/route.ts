@@ -26,7 +26,17 @@ export async function POST(req: NextRequest) {
     const { userId: clerkUserId } = auth();
     const resolvedAuthUserId = clerkUserId || (fallbackAuthId ? fallbackAuthId : null);
 
+    console.log("[PDF] Nueva solicitud recibida", {
+      hasFile: file instanceof File,
+      fallbackUsername,
+      fallbackSlug,
+      fallbackEmail: Boolean(fallbackEmail),
+      clerkSession: Boolean(clerkUserId),
+      fallbackAuthProvided: Boolean(fallbackAuthId),
+    });
+
     if (!resolvedAuthUserId) {
+      console.warn("[PDF] Rechazado: no se pudo resolver auth_user_id");
       return NextResponse.json(
         {
           error:
@@ -36,18 +46,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let authenticatedUser = null;
+    let authenticatedUser: Awaited<ReturnType<typeof currentUser>> | null = null;
     try {
       authenticatedUser = await currentUser();
     } catch (error) {
-      console.warn("No se pudo obtener currentUser desde Clerk:", error);
+      console.warn("[PDF] No se pudo obtener currentUser desde Clerk:", error);
     }
 
     if (!(file instanceof File)) {
+      console.warn("[PDF] Rechazado: no se adjunto archivo valido");
       return NextResponse.json({ error: "Archivo PDF requerido en 'file'" }, { status: 400 });
     }
 
-    let profileIdentity = null;
+    let profileIdentity: {
+      username: string;
+      displayName: string;
+      slug: string;
+      email: string | null;
+      authUserId: string;
+    } | null = null;
 
     if (authenticatedUser) {
       const primaryEmail =
@@ -97,7 +114,8 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    if (!profileIdentity.slug) {
+    if (!profileIdentity?.slug) {
+      console.warn("[PDF] Rechazado: no se pudo determinar el slug final");
       return NextResponse.json(
         {
           error:
@@ -107,11 +125,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const pb = new ProgressBar();
-    pb.set(2, 'Validando entrada...');
+    console.log("[PDF] Identidad resuelta", {
+      username: profileIdentity.username,
+      slug: profileIdentity.slug,
+      email: profileIdentity.email ? "si" : "no",
+      authUserId: profileIdentity.authUserId,
+      source: authenticatedUser ? "clerk" : fallbackAuthId ? "fallback" : "generado",
+    });
 
-    // Etapa 1: Leer el archivo
-    pb.set(12, 'Leyendo archivo...');
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -128,17 +149,28 @@ export async function POST(req: NextRequest) {
 
     const trimmedText = text.trim();
     if (!trimmedText) {
-      pb.set(50, '❌ No se pudo extraer texto del PDF');
+      console.warn("[PDF] Rechazado: no se obtuvo texto util del PDF");
       return NextResponse.json({ error: "No se pudo extraer texto del PDF" }, { status: 400 });
     }
+
+    console.log("[PDF] Contenido extraido", {
+      characters: trimmedText.length,
+    });
 
     const pollinationsToken = process.env.POLLINATIONS_API_TOKEN;
     let profileData: ProfileData | null = null;
     let processedWithAI = false;
 
     try {
+      console.log("[PDF] Enviando a Pollinations", {
+        tokenConfigured: Boolean(pollinationsToken),
+        characters: trimmedText.length,
+      });
       profileData = await reformulateAsProfessionalReport(trimmedText, pollinationsToken);
       processedWithAI = true;
+      console.log("[PDF] Pollinations respondio", {
+        sections: profileData.sections.length,
+      });
     } catch (aiError) {
       console.error("Error en procesamiento de IA:", aiError);
       processedWithAI = false;
@@ -151,6 +183,12 @@ export async function POST(req: NextRequest) {
       authUserId: profileIdentity.authUserId,
       pdfText: trimmedText,
       profileJson: profileData,
+    });
+
+    console.log("[PDF] Perfil guardado", {
+      slug: profile.slug,
+      processedWithAI,
+      sectionsCount: profileData?.sections.length ?? 0,
     });
 
     const ownerHint =
@@ -171,3 +209,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
