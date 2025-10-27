@@ -56,6 +56,19 @@ interface PollinationsResponse {
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1500;
 
+// No-op function for progress updates
+const updateProgress = (_progress: number, _message: string) => {
+  // This is a no-op implementation that does nothing
+  // Replace with actual progress update logic if needed
+  console.log(`Progress: ${_progress * 100}% - ${_message}`);
+};
+
+const OPENAI_API_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
+const OPENAI_TIMEOUT_MS = Number.parseInt(process.env.OPENAI_TIMEOUT_MS || "60000", 10);
+const OPENAI_MODEL_HTML = process.env.OPENAI_MODEL_HTML || "gpt-4o-mini";
+const OPENAI_ORG_ID = process.env.OPENAI_ORG_ID;
+const OPENAI_PROJECT_ID = process.env.OPENAI_PROJECT_ID;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -147,7 +160,7 @@ async function executePollinationsRequest(
           throw new Error(`Pollinations API error (${response.status}): ${errorText}`);
         }
 
-        updateProgress(0.7 + (0.2 * (attempt-1)/maxRetries), 'Recibiendo respuesta de la API...');
+        updateProgress(0.7 + (0.2 * (attempt-1)/MAX_RETRIES), 'Recibiendo respuesta de la API...');
         const data: PollinationsResponse = await response.json();
         const content = data.choices?.[0]?.message?.content;
 
@@ -320,6 +333,48 @@ export async function renderProfileToHtml(
   }
 
   parts.push("", "Devuelve solo el HTML sin comentarios ni bloques de codigo.");
+
+  if (process.env.OPENAI_API_KEY) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    };
+    if (OPENAI_ORG_ID) headers["OpenAI-Organization"] = OPENAI_ORG_ID as string;
+    if (OPENAI_PROJECT_ID) headers["OpenAI-Project"] = OPENAI_PROJECT_ID as string;
+
+    const body = {
+      model: OPENAI_MODEL_HTML,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: parts.join("\n") },
+      ],
+      temperature: 0.7,
+    };
+
+    const res = await fetch(`${OPENAI_API_URL}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`OpenAI API error (${res.status}): ${errText}`);
+    }
+
+    const data = (await res.json()) as any;
+    const content = data?.choices?.[0]?.message?.content as string | undefined;
+    if (!content || !content.trim()) {
+      throw new Error("La IA devolvio una respuesta vacia");
+    }
+    return normalizeContent(content);
+  }
 
   const requestBody: PollinationsRequest = {
     model: "openai",
