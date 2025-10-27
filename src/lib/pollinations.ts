@@ -1,4 +1,18 @@
 const POLLINATIONS_API_URL = "https://text.pollinations.ai/openai";
+// Timeout configurable (ms) para la petición a Pollinations. Default: 60s
+const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.POLLINATIONS_TIMEOUT_MS || "60000", 10);
+// Permitir desactivar verificación TLS solo si el entorno lo pide explícitamente (solo dev)
+const INSECURE_TLS = process.env.POLLINATIONS_TLS_INSECURE === '1';
+let warnedInsecureTls = false;
+
+// Si está activado en env y no es producción, desactivar verificación TLS a nivel global
+if (INSECURE_TLS && process.env.NODE_ENV !== 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  if (!warnedInsecureTls) {
+    console.warn('⚠️ TLS verification global desactivada para Pollinations (solo dev). Usa POLLINATIONS_TLS_INSECURE=0 para restaurar.');
+    warnedInsecureTls = true;
+  }
+}
 
 export interface PollinationsMessage {
   role: "system" | "user" | "assistant";
@@ -133,6 +147,7 @@ async function executePollinationsRequest(
           throw new Error(`Pollinations API error (${response.status}): ${errorText}`);
         }
 
+        updateProgress(0.7 + (0.2 * (attempt-1)/maxRetries), 'Recibiendo respuesta de la API...');
         const data: PollinationsResponse = await response.json();
         const content = data.choices?.[0]?.message?.content;
 

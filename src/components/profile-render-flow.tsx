@@ -87,7 +87,7 @@ export function ProfileRenderFlow({ initialProfile, isOwner }: ProfileRenderFlow
     } finally {
       setRendering(false);
     }
-  }, [user?.id]);
+  }, []);
 
   return (
     <div className="space-y-8">

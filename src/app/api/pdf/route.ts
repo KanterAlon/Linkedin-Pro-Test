@@ -107,6 +107,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const pb = new ProgressBar();
+    pb.set(2, 'Validando entrada...');
+
+    // Etapa 1: Leer el archivo
+    pb.set(12, 'Leyendo archivo...');
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -123,6 +128,7 @@ export async function POST(req: NextRequest) {
 
     const trimmedText = text.trim();
     if (!trimmedText) {
+      pb.set(50, '❌ No se pudo extraer texto del PDF');
       return NextResponse.json({ error: "No se pudo extraer texto del PDF" }, { status: 400 });
     }
 
