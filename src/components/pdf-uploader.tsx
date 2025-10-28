@@ -16,7 +16,7 @@ type PdfResponse = {
   error?: string;
 };
 
-export function PdfUploader() {
+export function PdfUploader({ mediumUsername }: { mediumUsername?: string }) {
   const { user, isLoaded, isSignedIn } = useUser();
   const clerk = useClerk();
   const [uploading, setUploading] = useState(false);
@@ -83,7 +83,10 @@ export function PdfUploader() {
         }
 
         setNotice("PDF procesado. Preparando tu perfil...");
-        window.location.assign(data.path);
+        const target = mediumUsername
+          ? `${data.path}?medium=${encodeURIComponent(mediumUsername)}`
+          : data.path;
+        window.location.assign(target);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Error al subir o procesar el PDF";
         setError(message);

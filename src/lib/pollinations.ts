@@ -103,7 +103,7 @@ async function executePollinationsRequest(
       name: "token in body",
       requiresToken: true,
       apply: (_, body) => {
-        (body as Record<string, unknown>).token = token;
+        (body as unknown as Record<string, unknown>).token = token;
       },
     });
   }
@@ -231,13 +231,16 @@ export async function reformulateAsProfessionalReport(
     "}",
     "",
     "Reglas:",
+    "- La fuente puede combinar TEXTO extraido del PDF y datos de Medium (p.ej., publicaciones destacadas).",
+    "- Integra coherentemente la informacion de Medium en el JSON (por ejemplo, una seccion de 'Articulos destacados' o 'Publicaciones'), sin duplicar y manteniendo consistencia.",
     "- No inventes informacion",
     "- No omitas datos relevantes",
     "- Devuelve solo el JSON sin texto extra",
   ].join("\n");
 
   const userPrompt = [
-    "Analiza el siguiente texto extraido de un PDF y organiza la informacion en el JSON descrito.",
+    "Analiza el siguiente texto combinado (PDF y, si esta disponible, datos provenientes de Medium) y organiza la informacion en el JSON descrito.",
+    "Si hay publicaciones/articulos de Medium, incluyelos en una seccion adecuada (p.ej., 'Articulos destacados'), resumiendo titulos y enlazando cuando sea posible.",
     "Devuelve UNICAMENTE el JSON valido.",
     "---",
     extractedText,

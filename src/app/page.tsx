@@ -1,11 +1,5 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  FileText,
-  LayoutDashboard,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, LayoutDashboard, ShieldCheck, Sparkles } from "lucide-react";
 import {
   SignInButton,
   SignedIn,
@@ -14,7 +8,7 @@ import {
 } from "@clerk/nextjs";
 import type { Route } from "next";
 
-import { PdfUploader } from "@/components/pdf-uploader";
+import { UploaderWithMedium } from "@/components/uploader-with-medium";
 
 const features = [
   {
@@ -170,15 +164,7 @@ export default function Home() {
                   Usamos el ZIP o JSON de LinkedIn para generar la estructura inicial de tu portafolio.
                 </p>
               </div>
-              <PdfUploader />
-              <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-300">
-                <p className="flex items-center gap-2 text-slate-200">
-                  <FileText className="size-4 text-blue-300" /> Seguridad al primer lugar
-                </p>
-                <p className="mt-2">
-                  Procesamos tu información de manera temporal y cifrada. Puedes eliminarla en cualquier momento desde tu panel.
-                </p>
-              </div>
+              <UploaderWithMedium />
             </div>
           </aside>
         </main>

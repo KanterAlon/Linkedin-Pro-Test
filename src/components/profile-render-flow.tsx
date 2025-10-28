@@ -31,6 +31,7 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [mediumUsername, setMediumUsername] = useState<string | null>(null);
 
   const hasHtml = Boolean(profile.profile_html);
 
@@ -59,6 +60,15 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
 
   const identityAuthId = user?.id ?? null;
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get("medium") || params.get("mediumUsername");
+      if (m) setMediumUsername(m);
+    } catch {}
+  }, []);
+
   const handleRender = useCallback(async () => {
     setError(null);
     setRendering(true);
@@ -69,6 +79,9 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
       const payload: Record<string, unknown> = {};
       if (identityAuthId) {
         payload.identityAuthId = identityAuthId;
+      }
+      if (mediumUsername) {
+        payload.mediumUsername = mediumUsername;
       }
 
       // Simular progreso mientras se renderiza

@@ -11,6 +11,11 @@ import {
   renderProfileToHtml,
   type ProfileData,
 } from "@/lib/pollinations";
+import {
+  getMediumUserIdByUsername,
+  getMediumTopArticlesByUserId,
+  buildMediumProfileText,
+} from "@/lib/mediumapi";
 
 export const runtime = "nodejs";
 
@@ -44,14 +49,17 @@ export async function POST(req: NextRequest) {
         : undefined;
     const fallbackAuthId =
       typeof body.identityAuthId === "string" ? String(body.identityAuthId).trim() : "";
+    const mediumUsername =
+      typeof body.mediumUsername === "string" ? String(body.mediumUsername).trim() : undefined;
 
-    const { userId } = auth();
+    const { userId } = await auth();
     const resolvedAuthId = userId || (fallbackAuthId ? fallbackAuthId : null);
 
     console.log("[RENDER] Solicitud recibida", {
       additionalInstructionsLength: additionalInstructions?.length ?? 0,
       hasAuthFromSession: Boolean(userId),
       hasFallbackAuth: Boolean(fallbackAuthId),
+      mediumUsernameProvided: Boolean(mediumUsername),
     });
 
     if (!resolvedAuthId) {
@@ -86,31 +94,49 @@ export async function POST(req: NextRequest) {
 
     let profileData = toProfileData(baseProfile.profile_json);
 
-    if (!profileData) {
-      if (!baseProfile.pdf_raw) {
-        console.warn("[RENDER] No hay datos estructurados ni PDF para reconstruir", {
-          slug: baseProfile.slug,
-        });
+    let mediumText: string | null = null;
+    if (mediumUsername) {
+      try {
+        const uid = await getMediumUserIdByUsername(mediumUsername);
+        if (uid) {
+          const articles = await getMediumTopArticlesByUserId(uid, 5);
+          mediumText = buildMediumProfileText(mediumUsername, articles);
+        }
+      } catch (e) {
+        console.warn("[RENDER] Fallo al obtener datos de Medium", { mediumUsername, e });
+      }
+    }
+
+    const shouldReformulate = !profileData || Boolean(mediumText);
+
+    if (shouldReformulate) {
+      const parts: string[] = [];
+      if (baseProfile.pdf_raw) parts.push(baseProfile.pdf_raw);
+      if (mediumText) parts.push(mediumText);
+
+      if (parts.length === 0) {
+        console.warn("[RENDER] No hay fuentes para reformular", { slug: baseProfile.slug });
         return NextResponse.json(
-          { error: "No hay datos estructurados para renderizar la pagina" },
+          { error: "No hay datos para generar el JSON estructurado" },
           { status: 400 }
         );
       }
 
-      console.log("[RENDER] Reconstruyendo JSON a partir del PDF almacenado", {
+      console.log("[RENDER] Reconstruyendo JSON a partir de fuentes disponibles", {
         slug: baseProfile.slug,
-        pdfCharacters: baseProfile.pdf_raw.length,
+        hasPdf: Boolean(baseProfile.pdf_raw),
+        hasMedium: Boolean(mediumText),
       });
 
       profileData = await reformulateAsProfessionalReport(
-        baseProfile.pdf_raw,
+        parts.join("\n\n"),
         pollinationsToken
       );
 
       await updateProfileJson({
         username: baseProfile.slug,
-        profileJson: profileData,
-        pdfText: baseProfile.pdf_raw,
+        profileJson: profileData as any,
+        pdfText: baseProfile.pdf_raw ?? null,
         resetHtml: false,
       });
 
@@ -118,6 +144,13 @@ export async function POST(req: NextRequest) {
         slug: baseProfile.slug,
         sections: profileData.sections.length,
       });
+    }
+
+    if (!profileData) {
+      return NextResponse.json(
+        { error: "No se pudo construir el JSON estructurado para renderizar" },
+        { status: 500 }
+      );
     }
 
     console.log("[RENDER] Enviando a Pollinations para HTML", {
