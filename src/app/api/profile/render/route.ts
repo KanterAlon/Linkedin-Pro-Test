@@ -51,6 +51,8 @@ export async function POST(req: NextRequest) {
       typeof body.identityAuthId === "string" ? String(body.identityAuthId).trim() : "";
     const mediumUsername =
       typeof body.mediumUsername === "string" ? String(body.mediumUsername).trim() : undefined;
+    const preferredRenderModel =
+      (body.renderModel === "openai" || body.renderModel === "gemini") ? body.renderModel as "openai" | "gemini" : undefined;
 
     const { userId } = await auth();
     const resolvedAuthId = userId || (fallbackAuthId ? fallbackAuthId : null);
@@ -60,6 +62,7 @@ export async function POST(req: NextRequest) {
       hasAuthFromSession: Boolean(userId),
       hasFallbackAuth: Boolean(fallbackAuthId),
       mediumUsernameProvided: Boolean(mediumUsername),
+      preferredRenderModel: preferredRenderModel ?? "default",
     });
 
     if (!resolvedAuthId) {
@@ -160,11 +163,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("[RENDER] Enviando a Pollinations para HTML", {
+    console.log("[RENDER] Enviando a AI para HTML", {
       slug: baseProfile.slug,
       sections: profileData.sections.length,
       tokenConfigured: Boolean(pollinationsToken),
       additionalInstructionsLength: additionalInstructions?.length ?? 0,
+      preferredModel: preferredRenderModel ?? "auto",
     });
 
     const html = await renderProfileToHtml(
@@ -172,6 +176,8 @@ export async function POST(req: NextRequest) {
       {
         username: baseProfile.username,
         additionalInstructions,
+        preferredModel: preferredRenderModel,
+        previousHtml: baseProfile.profile_html ?? undefined,
       },
       pollinationsToken
     );

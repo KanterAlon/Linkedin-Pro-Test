@@ -16,7 +16,7 @@ type PdfResponse = {
   error?: string;
 };
 
-export function PdfUploader({ mediumUsername }: { mediumUsername?: string }) {
+export function PdfUploader({ mediumUsername, renderModel }: { mediumUsername?: string; renderModel?: "openai" | "gemini" }) {
   const { user, isLoaded, isSignedIn } = useUser();
   const clerk = useClerk();
   const [uploading, setUploading] = useState(false);
@@ -88,11 +88,21 @@ export function PdfUploader({ mediumUsername }: { mediumUsername?: string }) {
           if (mediumUsername) {
             url.searchParams.set("medium", mediumUsername);
           }
+          if (renderModel) {
+            url.searchParams.set("renderModel", renderModel);
+          }
           window.location.assign(url.toString());
         } catch {
           // Fallback simple si URL() falla
-          const sep = data.path.includes("?") ? "&" : "?";
-          const target = mediumUsername ? `${data.path}${sep}medium=${encodeURIComponent(mediumUsername)}` : data.path;
+          let target = data.path;
+          const sep = target.includes("?") ? "&" : "?";
+          if (mediumUsername) {
+            target += `${sep}medium=${encodeURIComponent(mediumUsername)}`;
+          }
+          if (renderModel) {
+            const sep2 = target.includes("?") ? "&" : "?";
+            target += `${sep2}renderModel=${renderModel}`;
+          }
           window.location.assign(target);
         }
       } catch (err) {
@@ -102,7 +112,7 @@ export function PdfUploader({ mediumUsername }: { mediumUsername?: string }) {
         setUploading(false);
       }
     },
-    [clerk, identity, isSignedIn, user]
+    [clerk, identity, isSignedIn, user, mediumUsername, renderModel]
   );
 
   return (

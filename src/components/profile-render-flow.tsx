@@ -32,6 +32,7 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
   const [progressMessage, setProgressMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [mediumUsername, setMediumUsername] = useState<string | null>(null);
+  const [renderModel, setRenderModel] = useState<"openai" | "gemini" | null>(null);
   const [debugLines, setDebugLines] = useState<string[]>([]);
   const [apiMediumInfo, setApiMediumInfo] = useState<{
     provided: boolean;
@@ -83,6 +84,8 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
       const params = new URLSearchParams(window.location.search);
       const m = params.get("medium") || params.get("mediumUsername");
       if (m) setMediumUsername(m);
+      const model = params.get("renderModel") as "openai" | "gemini" | null;
+      if (model === "openai" || model === "gemini") setRenderModel(model);
     } catch {}
   }, []);
 
@@ -99,6 +102,9 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
       }
       if (mediumUsername) {
         payload.mediumUsername = mediumUsername;
+      }
+      if (renderModel) {
+        payload.renderModel = renderModel;
       }
 
       const startMsg = mediumUsername
@@ -183,11 +189,21 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
     }
   }, [isOwner, hasHtml, rendering, error, handleRender]);
 
-  // Si pureHtmlMode está activado y hay HTML, mostrar solo el HTML generado por la IA, sin overrides globales
+  // Si pureHtmlMode está activado y hay HTML, mostrar solo el HTML generado por la IA en un iframe aislado
   if (pureHtmlMode && hasHtml) {
+    const srcDoc = `<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n<style>html,body{margin:0;padding:0;background:#fff;color:#0f172a}</style>\n<script>window.tailwind=window.tailwind||{};window.tailwind.config={corePlugins:{preflight:false}};<\/script>\n<script src=\"https://cdn.tailwindcss.com\"><\/script>\n</head>\n<body>\n<div id=\"root\">${profile.profile_html ?? ""}</div>\n</body>\n</html>`;
     return (
       <>
-        <div dangerouslySetInnerHTML={{ __html: profile.profile_html ?? "" }} />
+        {/* Neutralizar estilos globales del shell */}
+        <style jsx global>{`
+          html, body, #__next { height: 100%; }
+          body { margin: 0 !important; background: #ffffff !important; color: initial !important; }
+        `}</style>
+        <iframe
+          className="block h-[100vh] w-full border-0"
+          srcDoc={srcDoc}
+          sandbox="allow-scripts allow-same-origin"
+        />
         {/* Controles mínimos, flotantes, no intrusivos */}
         <div className="fixed bottom-4 right-4 z-50 flex gap-2 text-xs">
           <button

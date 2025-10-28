@@ -84,6 +84,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
   const [rendering, setRendering] = useState(false);
   const [instructions, setInstructions] = useState("");
   const [renderInstructions, setRenderInstructions] = useState("");
+  const [renderModel, setRenderModel] = useState<"openai" | "gemini">("gemini");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -113,6 +114,11 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
 
   const hasJson = Boolean(jsonPreview);
   const hasHtml = Boolean(profile?.profile_html);
+
+  const previewSrcDoc = useMemo(() => {
+    const html = profile?.profile_html ?? "";
+    return `<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n<style>html,body{margin:0;padding:0;background:#fff;color:#0f172a}</style>\n<script>window.tailwind=window.tailwind||{};window.tailwind.config={corePlugins:{preflight:false}};<\/script>\n<script src=\"https://cdn.tailwindcss.com\"><\/script>\n</head>\n<body>\n<div id=\"root\">${html}</div>\n</body>\n</html>`;
+  }, [profile?.profile_html]);
 
   const resetFeedback = useCallback(() => {
     setError(null);
@@ -278,6 +284,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
     try {
       const body: Record<string, unknown> = {
         additionalInstructions: renderInstructions.trim() || undefined,
+        renderModel,
       };
       if (user?.id) {
         body.identityAuthId = user.id;
@@ -344,14 +351,14 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
               {ensuring ? "Preparando..." : "Preparar perfil vacio"}
             </button>
             {publicUrl && (
-              <Link
+              <a
                 href={publicUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-100 transition hover:border-blue-500/60 hover:bg-blue-500/20"
               >
                 Visitar pagina publica
-              </Link>
+              </a>
             )}
           </div>
         </div>
@@ -387,9 +394,10 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
           </header>
           <div className="flex-1 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
             {hasHtml ? (
-              <div
-                className="h-full overflow-auto px-4 py-6 text-sm"
-                dangerouslySetInnerHTML={{ __html: profile?.profile_html ?? "" }}
+              <iframe
+                className="block h-[720px] w-full border-0 bg-white"
+                srcDoc={previewSrcDoc}
+                sandbox="allow-scripts allow-same-origin"
               />
             ) : (
               <div className="flex h-full items-center justify-center px-4 text-center text-sm text-slate-400">
@@ -473,6 +481,20 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
         </header>
 
         <div className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="renderModel" className="mb-2 block text-sm font-medium text-slate-300">
+              Modelo de IA para renderizar
+            </label>
+            <select
+              id="renderModel"
+              value={renderModel}
+              onChange={(e) => setRenderModel(e.target.value as "openai" | "gemini")}
+              className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60"
+            >
+              <option value="gemini">Google Gemini (gemini-2.5-pro)</option>
+              <option value="openai">OpenAI (gpt-4o-mini)</option>
+            </select>
+          </div>
           <textarea
             value={renderInstructions}
             onChange={(event) => setRenderInstructions(event.target.value)}
