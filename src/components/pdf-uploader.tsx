@@ -83,10 +83,18 @@ export function PdfUploader({ mediumUsername }: { mediumUsername?: string }) {
         }
 
         setNotice("PDF procesado. Preparando tu perfil...");
-        const target = mediumUsername
-          ? `${data.path}?medium=${encodeURIComponent(mediumUsername)}`
-          : data.path;
-        window.location.assign(target);
+        try {
+          const url = new URL(data.path, window.location.origin);
+          if (mediumUsername) {
+            url.searchParams.set("medium", mediumUsername);
+          }
+          window.location.assign(url.toString());
+        } catch {
+          // Fallback simple si URL() falla
+          const sep = data.path.includes("?") ? "&" : "?";
+          const target = mediumUsername ? `${data.path}${sep}medium=${encodeURIComponent(mediumUsername)}` : data.path;
+          window.location.assign(target);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Error al subir o procesar el PDF";
         setError(message);

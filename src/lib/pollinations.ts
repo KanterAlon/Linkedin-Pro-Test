@@ -314,15 +314,17 @@ export async function renderProfileToHtml(
   token?: string
 ): Promise<string> {
   const systemPrompt = [
-    "Eres un desarrollador front-end experto en crear landing pages profesionales y portafolios.",
-    "Recibirás un JSON con secciones de contenido y debes generar HTML usando clases de Tailwind CSS.",
-    "Planifica integralmente el diseño de la página basándote en el contenido y el contexto del perfil: define jerarquía visual, layout, ritmo vertical, tipografía y una paleta consistente.",
-    "Tienes libertad creativa total para diseñar y componer una página completa desde cero: puedes reordenar, resumir o expandir secciones, crear bloques y layouts originales, y proponer estructura de navegación dentro del fragmento (anclas internas, índice, etc.) siempre que el resultado sea coherente con el perfil.",
-    "La respuesta debe ser un único fragmento HTML listo para incrustar, sin etiquetas <html> ni <body>.",
-    "Usa una estética elegante y moderna; separa claramente secciones y cuida el espaciado.",
-    "Incluye un hero destacado con el nombre del profesional si se provee, y un índice/TOC opcional cuando mejore la exploración.",
-    "Optimiza para legibilidad y responsividad (mobile-first).",
-    "No incluyas etiquetas <script> ni estilos in-line extensos: solo clases de Tailwind.",
+    "Eres un desarrollador front-end experto en crear landing pages y portafolios profesionales de nivel premium.",
+    "Recibirás un JSON con secciones de contenido y debes generar el HTML de TODA la página usando exclusivamente clases de Tailwind CSS.",
+    "Debes planificar y diseñar la página COMPLETA, no un simple maquetado: define estructura, navegación interna (anclas si aplica), hero, secciones, CTAs y footer.",
+    "Estilo: extremadamente moderno, limpio y profesional. Usa tipografías legibles, grids fluidos, cards bien espaciadas, bordes sutiles y, si aplica, gradientes suaves o glass sutil (sin animaciones).",
+    "Accesibilidad/legibilidad: garantiza alto contraste entre texto y fondo en todas las secciones. Evita texto blanco sobre fondo blanco o texto oscuro sobre fondo oscuro. Asegura tamaños y pesos de fuente adecuados.",
+    "Debes establecer EXPLÍCITAMENTE el color de fondo del contenedor raíz y el color de texto con clases de Tailwind (por ejemplo: <div class=\"min-h-screen bg-white text-slate-900\"> ... o <div class=\"min-h-screen bg-slate-950 text-slate-100\"> ...).",
+    "Paleta por defecto si no se especifica: tema claro con contenedor raíz <div class=\"min-h-screen bg-white text-slate-900\">... donde todo el contenido vive dentro.",
+    "Si el usuario indica una paleta o color dominante (p.ej., morado/purple/violeta), DEBES aplicarlo estrictamente en el contenedor raíz y en los componentes clave usando utilidades Tailwind (bg-*, text-*, from-*, to-*).",
+    "Puedes reordenar, resumir o expandir secciones para mejorar la narrativa, manteniendo coherencia con el perfil.",
+    "Restricciones: no incluyas etiquetas <html> ni <body>, no uses <script> y no utilices estilos in-line extensos; apóyate solo en utilidades de Tailwind.",
+    "Entrega: devuelve un único fragmento HTML listo para incrustar (sin comentarios).",
   ].join("\n");
 
   const parts: string[] = [
@@ -336,6 +338,20 @@ export async function renderProfileToHtml(
 
   if (options.additionalInstructions) {
     parts.push("", "Instrucciones adicionales:", options.additionalInstructions);
+    try {
+      const txt = options.additionalInstructions.toLowerCase();
+      const wantsPurple = /(morado|violeta|purple|lila|magenta)/.test(txt);
+      if (wantsPurple) {
+        parts.push(
+          "",
+          "Preferencia de paleta detectada: morado/purple.",
+          "APLICA ESTA PALETA de forma consistente en el contenedor raíz y componentes clave usando Tailwind:",
+          "- Contenedor raíz: usa bg-purple-950 text-purple-50 (tema oscuro) o bg-purple-50 text-slate-900 (tema claro) con contraste alto.",
+          "- Acentos y bordes: usa escalas de purple (p. ej., from-purple-600 to-fuchsia-600, border-purple-300/40).",
+          "- Botones/CTAs: variantes sólidas y sutiles en purple con hover seguro.",
+        );
+      }
+    } catch {}
   }
 
   parts.push("", "Devuelve solo el HTML sin comentarios ni bloques de codigo.");

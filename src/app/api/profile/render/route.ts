@@ -95,11 +95,15 @@ export async function POST(req: NextRequest) {
     let profileData = toProfileData(baseProfile.profile_json);
 
     let mediumText: string | null = null;
+    let mediumUserId: string | null = null;
+    let mediumArticlesCount = 0;
     if (mediumUsername) {
       try {
         const uid = await getMediumUserIdByUsername(mediumUsername);
+        mediumUserId = uid;
         if (uid) {
           const articles = await getMediumTopArticlesByUserId(uid, 5);
+          mediumArticlesCount = Array.isArray(articles) ? articles.length : 0;
           mediumText = buildMediumProfileText(mediumUsername, articles);
         }
       } catch (e) {
@@ -126,6 +130,9 @@ export async function POST(req: NextRequest) {
         slug: baseProfile.slug,
         hasPdf: Boolean(baseProfile.pdf_raw),
         hasMedium: Boolean(mediumText),
+        mediumUsername,
+        mediumUserId,
+        mediumArticlesCount,
       });
 
       profileData = await reformulateAsProfessionalReport(
@@ -191,6 +198,12 @@ export async function POST(req: NextRequest) {
       username: savedProfile.username,
       slug: savedProfile.slug,
       path: `/${savedProfile.slug}`,
+      medium: {
+        provided: Boolean(mediumUsername),
+        username: mediumUsername ?? null,
+        userId: mediumUserId,
+        articlesCount: mediumArticlesCount,
+      },
     });
   } catch (err) {
     console.error("Error renderizando perfil:", err);

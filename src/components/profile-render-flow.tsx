@@ -32,6 +32,23 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
   const [progressMessage, setProgressMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [mediumUsername, setMediumUsername] = useState<string | null>(null);
+  const [debugLines, setDebugLines] = useState<string[]>([]);
+  const [apiMediumInfo, setApiMediumInfo] = useState<{
+    provided: boolean;
+    username: string | null;
+    userId: string | null;
+    articlesCount: number;
+  } | null>(null);
+
+  async function logToServer(message: string, extra?: Record<string, unknown>) {
+    try {
+      await fetch("/api/debug/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, extra }),
+      });
+    } catch {}
+  }
 
   const hasHtml = Boolean(profile.profile_html);
 
@@ -84,6 +101,13 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
         payload.mediumUsername = mediumUsername;
       }
 
+      const startMsg = mediumUsername
+        ? `Iniciando render con Medium: ${mediumUsername}`
+        : "Iniciando render sin Medium";
+      console.log(startMsg);
+      setDebugLines((prev) => [...prev, startMsg]);
+      logToServer(startMsg, { mediumUsername });
+
       // Simular progreso mientras se renderiza
       const progressInterval = setInterval(() => {
         setProgress(prev => {
@@ -97,6 +121,8 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
       
       setProgress(30);
       setProgressMessage("Generando HTML con IA...");
+      setDebugLines((prev) => [...prev, "Llamando /api/profile/render..."]);
+      logToServer("Llamando /api/profile/render...", { mediumUsername });
       
       const response = await fetch("/api/profile/render", {
         method: "POST",
@@ -117,6 +143,17 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
         throw new Error(data.error || "No se pudo renderizar la pagina");
       }
 
+      const mediumInfo = (data as any)?.medium as
+        | { provided: boolean; username: string | null; userId: string | null; articlesCount: number }
+        | undefined;
+      if (mediumInfo) {
+        setApiMediumInfo(mediumInfo);
+        const line = `Medium API: provided=${mediumInfo.provided} username=${mediumInfo.username ?? "-"} userId=${mediumInfo.userId ?? "-"} articles=${mediumInfo.articlesCount}`;
+        console.log(line);
+        setDebugLines((prev) => [...prev, line]);
+        logToServer("Medium API result", mediumInfo as any);
+      }
+
       setProgress(100);
       setProgressMessage("¡Completado!");
       
@@ -131,6 +168,7 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
       setError(message);
       setRendering(false);
       setProgress(0);
+      logToServer("Render error", { error: message });
     }
   }, [identityAuthId]);
 
@@ -145,44 +183,57 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
     }
   }, [isOwner, hasHtml, rendering, error, handleRender]);
 
-  // Si pureHtmlMode está activado y hay HTML, mostrarlo sin ningún wrapper
+  // Si pureHtmlMode está activado y hay HTML, mostrar solo el HTML generado por la IA, sin overrides globales
   if (pureHtmlMode && hasHtml) {
     return (
       <>
-        {/* Reset de estilos globales del body para mostrar HTML puro */}
-        <style jsx global>{`
-          body {
-            background: white !important;
-            color: inherit !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-        `}</style>
-        {isOwner && (
-          <div className="fixed bottom-6 right-6 z-50 flex gap-3">
-            <button
-              onClick={() => window.history.back()}
-              className="flex items-center gap-2 rounded-full border border-white/20 bg-slate-900/90 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur transition hover:border-white/40 hover:bg-slate-800"
-            >
-              <ArrowLeft className="size-4" />
-              Volver
-            </button>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 rounded-full border border-white/20 bg-slate-900/90 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur transition hover:border-white/40 hover:bg-slate-800"
-            >
-              <ExternalLink className="size-4" />
-              Dashboard
-            </Link>
-          </div>
-        )}
         <div dangerouslySetInnerHTML={{ __html: profile.profile_html ?? "" }} />
+        {/* Controles mínimos, flotantes, no intrusivos */}
+        <div className="fixed bottom-4 right-4 z-50 flex gap-2 text-xs">
+          <button
+            onClick={() => window.history.back()}
+            className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/60 px-3 py-1.5 font-medium text-white shadow backdrop-blur-sm transition hover:bg-black/70"
+            aria-label="Volver"
+            title="Volver"
+          >
+            <ArrowLeft className="size-3" />
+            Volver
+          </button>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/60 px-3 py-1.5 font-medium text-white shadow backdrop-blur-sm transition hover:bg-black/70"
+            aria-label="Dashboard"
+            title="Dashboard"
+          >
+            <ExternalLink className="size-3" />
+            Dashboard
+          </Link>
+        </div>
       </>
     );
   }
 
   return (
     <div className="space-y-8">
+      {(mediumUsername || debugLines.length > 0 || apiMediumInfo) && (
+        <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 text-xs text-slate-300">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-semibold text-slate-200">Medium Debug</span>
+            <span className="text-slate-400">{mediumUsername ? `@${mediumUsername}` : "sin usuario"}</span>
+          </div>
+          {apiMediumInfo && (
+            <div className="mb-2 grid grid-cols-2 gap-2 text-slate-300">
+              <div>provided: {String(apiMediumInfo.provided)}</div>
+              <div>articles: {apiMediumInfo.articlesCount}</div>
+              <div>userId: {apiMediumInfo.userId ?? "-"}</div>
+              <div>username: {apiMediumInfo.username ?? "-"}</div>
+            </div>
+          )}
+          {debugLines.length > 0 && (
+            <pre className="max-h-40 overflow-auto whitespace-pre-wrap leading-5">{debugLines.join("\n")}</pre>
+          )}
+        </div>
+      )}
       {/* Barra superior con botón Volver (solo en modo normal) */}
       <div className="flex items-center justify-start">
         <button
@@ -218,7 +269,7 @@ export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = fals
           </div>
 
           <div
-            className="rounded-3xl border border-white/10 bg-slate-950/60 p-8 shadow-2xl"
+            className="rounded-3xl border border-white/10 bg-slate-950/60 p-8 text-slate-100 shadow-2xl"
             dangerouslySetInnerHTML={{ __html: profile.profile_html ?? "" }}
           />
         </section>
