@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, PlayCircle, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, ExternalLink, ArrowLeft } from "lucide-react";
 
 import { useUser } from "@clerk/nextjs";
 
@@ -21,14 +21,16 @@ type RenderResponse = {
 type ProfileRenderFlowProps = {
   initialProfile: UserProfileRow;
   isOwner: boolean;
+  pureHtmlMode?: boolean;
 };
 
-export function ProfileRenderFlow({ initialProfile, isOwner }: ProfileRenderFlowProps) {
+export function ProfileRenderFlow({ initialProfile, isOwner, pureHtmlMode = false }: ProfileRenderFlowProps) {
   const { user } = useUser();
   const [profile, setProfile] = useState<UserProfileRow>(initialProfile);
   const [rendering, setRendering] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const hasHtml = Boolean(profile.profile_html);
 
@@ -59,14 +61,30 @@ export function ProfileRenderFlow({ initialProfile, isOwner }: ProfileRenderFlow
 
   const handleRender = useCallback(async () => {
     setError(null);
-    setSuccess(null);
     setRendering(true);
+    setProgress(0);
+    setProgressMessage("Iniciando renderizado...");
+    
     try {
       const payload: Record<string, unknown> = {};
       if (identityAuthId) {
         payload.identityAuthId = identityAuthId;
       }
 
+      // Simular progreso mientras se renderiza
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 90) return prev;
+          return prev + Math.random() * 15;
+        });
+      }, 500);
+
+      setProgressMessage("Analizando contenido...");
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      setProgress(30);
+      setProgressMessage("Generando HTML con IA...");
+      
       const response = await fetch("/api/profile/render", {
         method: "POST",
         headers: {
@@ -75,24 +93,93 @@ export function ProfileRenderFlow({ initialProfile, isOwner }: ProfileRenderFlow
         credentials: "include",
         body: JSON.stringify(payload),
       });
+      
+      clearInterval(progressInterval);
+      setProgress(95);
+      setProgressMessage("Finalizando...");
+      
       const data = (await response.json()) as RenderResponse;
 
       if (!response.ok) {
         throw new Error(data.error || "No se pudo renderizar la pagina");
       }
 
+      setProgress(100);
+      setProgressMessage("¡Completado!");
+      
+      // Esperar un momento antes de actualizar el perfil para mostrar el 100%
+      await new Promise(resolve => setTimeout(resolve, 500));
       setProfile(data.record);
-      setSuccess("Pagina renderizada correctamente. Lista para compartir.");
+      
+      // Recargar la página para mostrar el HTML puro
+      window.location.reload();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al renderizar la pagina";
       setError(message);
-    } finally {
       setRendering(false);
+      setProgress(0);
     }
   }, [identityAuthId]);
 
+  // Iniciar renderizado automáticamente si es owner y no hay HTML
+  useEffect(() => {
+    if (isOwner && !hasHtml && !rendering && !error) {
+      // Pequeño delay para mejor UX
+      const timer = setTimeout(() => {
+        handleRender();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOwner, hasHtml, rendering, error, handleRender]);
+
+  // Si pureHtmlMode está activado y hay HTML, mostrarlo sin ningún wrapper
+  if (pureHtmlMode && hasHtml) {
+    return (
+      <>
+        {/* Reset de estilos globales del body para mostrar HTML puro */}
+        <style jsx global>{`
+          body {
+            background: white !important;
+            color: inherit !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        `}</style>
+        {isOwner && (
+          <div className="fixed bottom-6 right-6 z-50 flex gap-3">
+            <button
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2 rounded-full border border-white/20 bg-slate-900/90 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur transition hover:border-white/40 hover:bg-slate-800"
+            >
+              <ArrowLeft className="size-4" />
+              Volver
+            </button>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 rounded-full border border-white/20 bg-slate-900/90 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur transition hover:border-white/40 hover:bg-slate-800"
+            >
+              <ExternalLink className="size-4" />
+              Dashboard
+            </Link>
+          </div>
+        )}
+        <div dangerouslySetInnerHTML={{ __html: profile.profile_html ?? "" }} />
+      </>
+    );
+  }
+
   return (
     <div className="space-y-8">
+      {/* Barra superior con botón Volver (solo en modo normal) */}
+      <div className="flex items-center justify-start">
+        <button
+          onClick={() => window.history.back()}
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/10"
+        >
+          <ArrowLeft className="size-4" />
+          Volver
+        </button>
+      </div>
       {hasHtml ? (
         <section className="space-y-6">
           <div className="flex items-center justify-between rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-6">
@@ -126,16 +213,16 @@ export function ProfileRenderFlow({ initialProfile, isOwner }: ProfileRenderFlow
         <>
           {isOwner ? (
             <>
+              {/* Mostrar datos extraídos */}
               <section className="space-y-4 rounded-3xl border border-white/10 bg-slate-950/60 p-8 shadow-lg">
                 <header className="flex items-center gap-3">
                   <span className="inline-flex size-10 items-center justify-center rounded-2xl bg-blue-500/10 text-base font-semibold text-blue-200">
                     1
                   </span>
                   <div>
-                    <h2 className="text-lg font-semibold text-white">Revisa los datos extraidos</h2>
+                    <h2 className="text-lg font-semibold text-white">Datos extraidos</h2>
                     <p className="text-sm text-slate-300">
-                      Asegurate de que el contenido generado a partir de tu PDF sea correcto antes de
-                      continuar.
+                      Contenido procesado de tu PDF que será usado para generar tu página.
                     </p>
                   </div>
                 </header>
@@ -165,56 +252,59 @@ export function ProfileRenderFlow({ initialProfile, isOwner }: ProfileRenderFlow
                 )}
               </section>
 
+              {/* Barra de progreso automática */}
               <section className="space-y-4 rounded-3xl border border-white/10 bg-slate-950/60 p-8 shadow-lg">
                 <header className="flex items-center gap-3">
                   <span className="inline-flex size-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-base font-semibold text-emerald-200">
                     2
                   </span>
                   <div>
-                    <h2 className="text-lg font-semibold text-white">Renderiza tu pagina</h2>
+                    <h2 className="text-lg font-semibold text-white">Renderizando tu página</h2>
                     <p className="text-sm text-slate-300">
-                      Genera el HTML con diseno profesional. Podras volver a renderizarla desde el
-                      dashboard cuando quieras.
+                      Generando HTML con diseño profesional automáticamente...
                     </p>
                   </div>
                 </header>
 
-                <button
-                  onClick={handleRender}
-                  disabled={rendering || (!jsonPreview && !pdfPreview)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700"
-                >
-                  {rendering ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <PlayCircle className="size-4" />
-                  )}
-                  {rendering ? "Generando pagina..." : "Continuar y renderizar pagina"}
-                </button>
+                {rendering && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-300">{progressMessage}</span>
+                      <span className="font-semibold text-emerald-400">{Math.round(progress)}%</span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-blue-500 transition-all duration-500 ease-out"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-sm text-slate-400">
+                      <Loader2 className="size-4 animate-spin" />
+                      <span>Esto puede tardar unos segundos...</span>
+                    </div>
+                  </div>
+                )}
 
-                <p className="text-xs text-slate-400">
-                  Guardaremos el resultado en tu cuenta y podras compartirlo en /{profile.slug}.
-                </p>
+                {!rendering && !error && (
+                  <div className="flex items-center justify-center gap-2 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4 text-sm text-blue-100">
+                    <Sparkles className="size-5" />
+                    <span>Iniciando renderizado automático...</span>
+                  </div>
+                )}
               </section>
             </>
           ) : (
             <section className="rounded-3xl border border-white/10 bg-slate-950/60 p-8 text-center text-sm text-slate-300 shadow-lg">
               <Sparkles className="mx-auto mb-4 size-10 text-slate-500" />
-              <p>Esta pagina aun esta en proceso de generacion. Vuelve mas tarde para ver el resultado.</p>
+              <p>Esta página está en proceso de generación. Vuelve más tarde para ver el resultado.</p>
             </section>
           )}
         </>
       )}
 
-      {(error || success) && (
-        <div
-          className={`rounded-2xl px-4 py-3 text-sm ${
-            error
-              ? "border border-rose-500/30 bg-rose-500/10 text-rose-100"
-              : "border border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
-          }`}
-        >
-          {error ?? success}
+      {error && (
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+          {error}
         </div>
       )}
     </div>

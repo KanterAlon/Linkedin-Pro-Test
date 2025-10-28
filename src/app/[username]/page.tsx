@@ -25,19 +25,23 @@ export default async function UserPage({ params, searchParams }: PageParams) {
     notFound();
   }
 
-  const { userId } = auth();
+  const { userId } = await auth();
   const resolvedAuthId = userId || (fallbackAuthId ?? null);
   const isOwner = Boolean(
     resolvedAuthId && profile.auth_user_id && profile.auth_user_id === resolvedAuthId
   );
 
   const hasHtml = Boolean(profile.profile_html);
-  const hasJson = Boolean(profile.profile_json);
 
-  const StatusIcon = hasHtml ? Sparkles : hasJson ? Code : FileText;
-  const statusLabel = hasHtml
-    ? "Pagina lista para compartir"
-    : hasJson
+  // Si hay HTML renderizado, mostrarlo puro sin wrapper de LinkedIn Pro
+  if (hasHtml) {
+    return <ProfileRenderFlow initialProfile={profile} isOwner={isOwner} pureHtmlMode />;
+  }
+
+  // Si no hay HTML, mostrar la interfaz de generación
+  const hasJson = Boolean(profile.profile_json);
+  const StatusIcon = hasJson ? Code : FileText;
+  const statusLabel = hasJson
     ? "Datos listos para renderizar"
     : "Texto extraido del PDF";
 
@@ -62,7 +66,7 @@ export default async function UserPage({ params, searchParams }: PageParams) {
               </p>
               {isOwner && (
                 <p className="mt-2 text-xs text-slate-400">
-                  Sigue los pasos para publicar tu pagina o editala luego desde el dashboard.
+                  Generando tu pagina automaticamente...
                 </p>
               )}
             </div>

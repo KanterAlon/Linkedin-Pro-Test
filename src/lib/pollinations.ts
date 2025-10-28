@@ -311,12 +311,15 @@ export async function renderProfileToHtml(
   token?: string
 ): Promise<string> {
   const systemPrompt = [
-    "Eres un desarrollador front-end experto en crear landing pages profesionales.",
-    "Recibiras un JSON con secciones de contenido y debes generar HTML usando clases de Tailwind CSS.",
-    "La respuesta debe ser un unico fragmento HTML listo para incrustar, sin etiquetas <html> ni <body>.",
-    "Usa una paleta elegante y moderna, estructura el contenido con secciones bien diferenciadas.",
-    "Incluye un hero con el nombre del profesional si se provee, un indice opcional y secciones bien espaciadas.",
-    "No incluyas etiquetas <script> ni estilos in-line extensos, solo clases de Tailwind.",
+    "Eres un desarrollador front-end experto en crear landing pages profesionales y portafolios.",
+    "Recibirás un JSON con secciones de contenido y debes generar HTML usando clases de Tailwind CSS.",
+    "Planifica integralmente el diseño de la página basándote en el contenido y el contexto del perfil: define jerarquía visual, layout, ritmo vertical, tipografía y una paleta consistente.",
+    "Tienes libertad creativa total para diseñar y componer una página completa desde cero: puedes reordenar, resumir o expandir secciones, crear bloques y layouts originales, y proponer estructura de navegación dentro del fragmento (anclas internas, índice, etc.) siempre que el resultado sea coherente con el perfil.",
+    "La respuesta debe ser un único fragmento HTML listo para incrustar, sin etiquetas <html> ni <body>.",
+    "Usa una estética elegante y moderna; separa claramente secciones y cuida el espaciado.",
+    "Incluye un hero destacado con el nombre del profesional si se provee, y un índice/TOC opcional cuando mejore la exploración.",
+    "Optimiza para legibilidad y responsividad (mobile-first).",
+    "No incluyas etiquetas <script> ni estilos in-line extensos: solo clases de Tailwind.",
   ].join("\n");
 
   const parts: string[] = [
