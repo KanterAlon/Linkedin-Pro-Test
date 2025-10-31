@@ -140,14 +140,14 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
 
         if (response.status === 401) {
           setProfile(null);
-          setError("Debes iniciar sesion para ver tu perfil.");
+          setError("Por favor inicia sesión para ver tu información personal.");
           return;
         }
 
         if (response.status === 404) {
           setProfile(null);
           if (showSuccess) {
-            setFeedback("Sube tu PDF desde la pagina principal para preparar tu perfil.");
+            setFeedback("Comienza subiendo tu CV en PDF desde la página principal para crear tu perfil.");
           }
           return;
         }
@@ -155,7 +155,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
         const data = (await response.json()) as GetProfileResponse & ApiErrorResponse;
 
         if (!response.ok) {
-          throw new Error(data.error || "No se pudo cargar el perfil");
+          throw new Error(data.error || "No se pudo cargar tu información");
         }
 
         setProfile(data.profile);
@@ -163,7 +163,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
           setFeedback("Perfil sincronizado correctamente.");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Error cargando el perfil.");
+        setError(err instanceof Error ? err.message : "Error al cargar tu información.");
       } finally {
         setLoadingProfile(false);
       }
@@ -195,20 +195,20 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
       });
 
       if (response.status === 401) {
-        setError("Debes iniciar sesion para preparar tu perfil.");
+        setError("Por favor inicia sesión para configurar tu perfil.");
         return;
       }
 
       const data = (await response.json()) as EnsureProfileResponse & ApiErrorResponse;
 
       if (!response.ok) {
-        throw new Error(data.error || "No se pudo preparar el perfil");
+        throw new Error(data.error || "No se pudo configurar tu perfil");
       }
 
       setProfile(data.profile);
-      setFeedback("Perfil listo. Ahora puedes subir un PDF o trabajar con el agente.");
+      setFeedback("¡Listo! Ahora puedes subir tu CV o comenzar a personalizar tu perfil.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error preparando el perfil.");
+      setError(err instanceof Error ? err.message : "Error al configurar tu perfil.");
     } finally {
       setEnsuring(false);
     }
@@ -217,7 +217,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
   const handleAugment = useCallback(async () => {
     const trimmed = instructions.trim();
     if (!trimmed) {
-      setError("Escribe instrucciones antes de enviar.");
+      setError("Por favor escribe lo que te gustaría modificar en tu perfil.");
       return;
     }
 
@@ -240,18 +240,18 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
       });
 
       if (response.status === 401) {
-        throw new Error("Debes iniciar sesion para usar el agente.");
+        throw new Error("Por favor inicia sesión para usar esta función.");
       }
 
       const data = (await response.json()) as AugmentResponse & ApiErrorResponse;
 
       if (!response.ok) {
-        throw new Error(data.error || "No se pudo actualizar el JSON");
+        throw new Error(data.error || "No se pudo actualizar la información");
       }
 
       setProfile(data.record);
       setInstructions("");
-      setFeedback("JSON actualizado. Renderiza la pagina para aplicar los cambios.");
+      setFeedback("¡Cambios guardados! Revisa la vista previa o publica para ver los cambios.");
 
       const assistantSummary = `Actualice el JSON con ${data.profile.sections.length} secciones.`;
       const timestamp = Date.now();
@@ -271,7 +271,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
         },
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al interactuar con el agente.");
+      setError(err instanceof Error ? err.message : "Error al procesar tu solicitud.");
     } finally {
       setAugmenting(false);
     }
@@ -300,19 +300,19 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
       });
 
       if (response.status === 401) {
-        throw new Error("Debes iniciar sesion para renderizar la pagina.");
+        throw new Error("Por favor inicia sesión para publicar tu perfil.");
       }
 
       const data = (await response.json()) as RenderResponse & ApiErrorResponse;
 
       if (!response.ok) {
-        throw new Error(data.error || "No se pudo renderizar la pagina");
+        throw new Error(data.error || "No se pudo publicar tu perfil");
       }
 
       setProfile(data.record);
-      setFeedback("Pagina renderizada y guardada. Abre la URL publica para revisarla.");
+      setFeedback("¡Tu perfil ha sido publicado! Puedes verlo en la URL pública.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error renderizando la pagina.");
+      setError(err instanceof Error ? err.message : "Error al publicar tu perfil.");
     } finally {
       setRendering(false);
     }
@@ -329,8 +329,8 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
             </h2>
             <p className="text-sm text-slate-400">
               {profile
-                ? "Gestiona tu JSON, enriquece las secciones y renderiza la pagina final con un solo clic."
-                : "Todavia no hemos procesado ningun PDF para tu cuenta. Sube uno desde la pagina principal o prepara un perfil vacio."}
+                ? "Administra tu información personal, edita las secciones y actualiza tu perfil web fácilmente."
+                : "Comienza subiendo tu CV en PDF desde la página principal para crear tu perfil."}
             </p>
           </div>
           <div className="flex flex-col gap-3">
@@ -340,15 +340,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
               className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white transition hover:border-white/40 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/60"
             >
               {loadingProfile ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-              {loadingProfile ? "Sincronizando..." : "Sincronizar datos"}
-            </button>
-            <button
-              onClick={ensureProfileExists}
-              disabled={ensuring}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white transition hover:border-white/40 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/60"
-            >
-              {ensuring ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {ensuring ? "Preparando..." : "Preparar perfil vacio"}
+              {loadingProfile ? "Actualizando..." : "Actualizar información"}
             </button>
             {publicUrl && (
               <a
@@ -367,19 +359,48 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-lg">
           <header>
-            <h3 className="text-lg font-semibold text-white">JSON actual en Supabase</h3>
+            <h3 className="text-lg font-semibold text-white">Vista previa de tu perfil</h3>
             <p className="text-xs text-slate-400">
-              Este es el contenido estructurado que se utiliza para renderizar tu pagina.
+              Así es como se verá tu perfil con los cambios actuales
             </p>
           </header>
-          <div className="relative flex-1 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
+          <div className="relative flex-1 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 p-4">
             {jsonPreview ? (
-              <pre className="h-full overflow-auto whitespace-pre-wrap p-4 text-xs text-slate-100">
-                {jsonPreview}
-              </pre>
+              <div className="h-full overflow-auto">
+                {(() => {
+                  try {
+                    const data = JSON.parse(jsonPreview);
+                    if (data?.sections?.length > 0) {
+                      return (
+                        <div className="space-y-4">
+                          {data.sections.map((section: any, index: number) => (
+                            <div key={index} className="rounded-xl border border-white/10 bg-slate-800/50 p-4 shadow">
+                              <h4 className="mb-2 text-sm font-medium text-blue-400">{section.header}</h4>
+                              <p className="whitespace-pre-line text-sm text-slate-200">
+                                {section.text}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return (
+                      <pre className="h-full overflow-auto whitespace-pre-wrap p-4 text-xs text-slate-100">
+                        {jsonPreview}
+                      </pre>
+                    );
+                  } catch (e) {
+                    return (
+                      <pre className="h-full overflow-auto whitespace-pre-wrap p-4 text-xs text-slate-100">
+                        {jsonPreview}
+                      </pre>
+                    );
+                  }
+                })()}
+              </div>
             ) : (
               <div className="flex h-full items-center justify-center px-4 text-center text-sm text-slate-400">
-                Aun no tenemos JSON generado. Procesa un PDF o usa el agente para crear contenido.
+                Aún no hay información para mostrar. Sube tu CV o comienza a editar tu perfil para ver los cambios aquí.
               </div>
             )}
           </div>
@@ -387,9 +408,9 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
 
         <div className="flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-lg">
           <header>
-            <h3 className="text-lg font-semibold text-white">Previsualizacion del HTML</h3>
+            <h3 className="text-lg font-semibold text-white">Vista previa de la página</h3>
             <p className="text-xs text-slate-400">
-              Esta es la ultima version renderizada. Vuelve a generar cuando actualices el JSON.
+              Vista previa de cómo se verá tu perfil web. Actualiza después de hacer cambios.
             </p>
           </header>
           <div className="flex-1 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
@@ -401,7 +422,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
               />
             ) : (
               <div className="flex h-full items-center justify-center px-4 text-center text-sm text-slate-400">
-                Aun no has renderizado la pagina. Hazlo desde el paso de renderizado.
+                Aún no has publicado tu perfil. Completa la información y haz clic en 'Publicar perfil'.
               </div>
             )}
           </div>
@@ -414,9 +435,9 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
             <MessageSquare className="size-4" />
           </span>
           <div>
-            <h3 className="text-xl font-semibold text-white">Agente IA para enriquecer tu perfil</h3>
+            <h3 className="text-xl font-semibold text-white">Asistente de perfil</h3>
             <p className="text-sm text-slate-400">
-              Pega textos, nuevas experiencias o instrucciones detalladas. El agente actualizara el JSON por ti.
+              Describe los cambios que deseas hacer y nuestro asistente te ayudará a aplicarlos en tu perfil.
             </p>
           </div>
         </header>
@@ -427,7 +448,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
               value={instructions}
               onChange={(event) => setInstructions(event.target.value)}
               rows={6}
-              placeholder="Ejemplo: agrega una seccion de proyectos con el siguiente texto..."
+              placeholder="Por ejemplo: Agrega una sección de experiencia con mi último trabajo en..."
               className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/60"
             />
             <button
@@ -436,16 +457,16 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
               className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-slate-700"
             >
               {augmenting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              {augmenting ? "Actualizando JSON..." : "Enviar al agente IA"}
+              {augmenting ? "Procesando..." : "Actualizar perfil"}
             </button>
           </div>
 
           <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-            <h4 className="text-sm font-semibold text-slate-200">Historial reciente</h4>
+            <h4 className="text-sm font-semibold text-slate-200">Actividad reciente</h4>
             <div className="flex max-h-64 flex-col gap-3 overflow-auto pr-1">
               {messages.length === 0 ? (
                 <p className="text-xs text-slate-400">
-                  No hay mensajes aun. Envia instrucciones para ver los cambios que hace el agente.
+                  Aquí verás el historial de cambios que realices con la ayuda del asistente.
                 </p>
               ) : (
                 messages.map((message) => (
@@ -474,16 +495,16 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
 
       <section className="rounded-3xl border border-white/10 bg-slate-950/60 p-8 shadow-lg">
         <header>
-          <h3 className="text-xl font-semibold text-white">Renderizar pagina final</h3>
+          <h3 className="text-xl font-semibold text-white">Publicar tu perfil</h3>
           <p className="text-sm text-slate-400">
-            Cuando el JSON este listo, genera un nuevo HTML. Puedes anadir indicaciones sobre estilo o estructura.
+            Cuando estés satisfecho con los cambios, publica tu perfil para que sea visible en línea.
           </p>
         </header>
 
         <div className="mt-6 space-y-4">
           <div>
             <label htmlFor="renderModel" className="mb-2 block text-sm font-medium text-slate-300">
-              Modelo de IA para renderizar
+              Estilo de diseño
             </label>
             <select
               id="renderModel"
@@ -499,7 +520,7 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
             value={renderInstructions}
             onChange={(event) => setRenderInstructions(event.target.value)}
             rows={4}
-            placeholder="Ejemplo: usa una paleta morada y agrega un llamado a la accion al final..."
+            placeholder="Por ejemplo: Usa colores profesionales y agrega un botón de contacto..."
             className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/60"
           />
           <button
@@ -508,11 +529,11 @@ export function ProfileAgentPanel({ baseUrl }: ProfileAgentPanelProps) {
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700"
           >
             {rendering ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            {rendering ? "Generando HTML..." : "Renderizar pagina"}
+            {rendering ? "Publicando..." : "Publicar perfil"}
           </button>
           {!hasJson && (
             <p className="text-xs text-slate-400">
-              Genera primero el JSON (subiendo un PDF o usando el agente) para poder renderizar.
+              Completa la información de tu perfil antes de publicar.
             </p>
           )}
         </div>
